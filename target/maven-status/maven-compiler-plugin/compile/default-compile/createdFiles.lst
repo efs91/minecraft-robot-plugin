@@ -1,0 +1,16 @@
+com\example\robotplugin\commands\TraceCommand$1.class
+com\example\robotplugin\robot\RobotBlock.class
+com\example\robotplugin\commands\DescendsCommand.class
+com\example\robotplugin\listeners\RobotBreakListener.class
+com\example\robotplugin\commands\RobotStopCommand.class
+com\example\robotplugin\commands\TraceCommand.class
+com\example\robotplugin\commands\RepeteCommand.class
+com\example\robotplugin\robot\RobotBlock$1.class
+com\example\robotplugin\listeners\PlayerJoinListener.class
+com\example\robotplugin\listeners\PlayerQuitListener.class
+com\example\robotplugin\commands\MonteCommand.class
+com\example\robotplugin\RobotPlugin.class
+com\example\robotplugin\commands\RepeteCommand$1.class
+com\example\robotplugin\commands\RepeteCommand$Instruction.class
+com\example\robotplugin\commands\RobotCommand.class
+com\example\robotplugin\listeners\RobotPlaceListener.class

@@ -1,0 +1,31 @@
+name: RobotPlugin
+main: com.example.robotplugin.RobotPlugin
+version: 1.0
+api-version: 1.16
+description: Plugin qui permet aux joueurs de contrôler un robot (bloc de terre cuite émaillée magenta)
+
+commands:
+  avance:
+    description: Fait avancer le robot du nombre de blocs spécifiés
+    usage: /avance <nombre>
+  recule:
+    description: Fait reculer le robot du nombre de blocs spécifiés
+    usage: /recule <nombre>
+  tourne:
+    description: Fait tourner le robot du nombre de degrés spécifiés (90 ou 45 recommandés)
+    usage: /tourne <degrés>
+  monte:
+    description: Fait monter le robot du nombre de blocs spécifiés
+    usage: /monte <nombre>
+  descends:
+    description: Fait descendre le robot du nombre de blocs spécifiés
+    usage: /descends <nombre>
+  repete:
+    description: Répète une séquence d'instructions un nombre de fois spécifié
+    usage: /repete <nombre> (<instruction1> <instruction2> ... <instructionN>)
+  trace:
+    description: Active ou désactive le tracé du robot avec de la laine colorée
+    usage: /trace <on|off> [couleur]
+  robot:
+    description: Commandes spéciales pour le robot
+    usage: /robot <commande>
