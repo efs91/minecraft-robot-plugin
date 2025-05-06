@@ -79,4 +79,4 @@ The plugin is configured via the `plugin.yml` file in `src/main/resources`.
 Contributions are welcome! Please feel free to submit a pull request or open an issue for any enhancements or bug fixes.
 
 ## License
-This project is licensed under the MIT License. See the LICENSE file for more details.
+This project is licensed under the GNU General Public License v3 (GPL-3.0). See the LICENSE file for more details.
