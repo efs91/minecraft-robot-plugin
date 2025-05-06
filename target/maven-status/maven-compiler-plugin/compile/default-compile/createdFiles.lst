@@ -9,7 +9,9 @@ com\example\robotplugin\robot\RobotBlock$1.class
 com\example\robotplugin\listeners\PlayerJoinListener.class
 com\example\robotplugin\listeners\PlayerQuitListener.class
 com\example\robotplugin\commands\MonteCommand.class
+com\example\robotplugin\commands\FonctionCommand.class
 com\example\robotplugin\RobotPlugin.class
+com\example\robotplugin\commands\FonctionCommand$FunctionDefinition.class
 com\example\robotplugin\commands\RepeteCommand$1.class
 com\example\robotplugin\commands\RepeteCommand$Instruction.class
 com\example\robotplugin\commands\RobotCommand.class

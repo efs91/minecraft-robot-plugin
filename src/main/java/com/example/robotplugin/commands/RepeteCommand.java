@@ -1,9 +1,10 @@
 package com.example.robotplugin.commands;
 
 import com.example.robotplugin.RobotPlugin;
+import com.example.robotplugin.commands.FonctionCommand;
+import com.example.robotplugin.commands.FonctionCommand.FunctionDefinition;
 import com.example.robotplugin.listeners.RobotPlaceListener;
 import com.example.robotplugin.robot.RobotBlock;
-import org.bukkit.Bukkit;
 import org.bukkit.DyeColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -14,6 +15,7 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
@@ -93,21 +95,33 @@ public class RepeteCommand implements CommandExecutor {
         instructionsStr = instructionsStr.substring(1, instructionsStr.length() - 1).trim();
 
         // Analyser les instructions
-        List<Instruction> instructions = parseInstructions(instructionsStr);
-        if (instructions.isEmpty()) {
+        List<Instruction> parsed = parseInstructions(instructionsStr);
+        if (parsed.isEmpty()) {
             player.sendMessage("§cAucune instruction valide trouvée.");
             return true;
         }
 
-        // Exécuter les instructions de façon asynchrone
+        // Aplatir récursivement les instructions et créer la queue finale
+        List<Instruction> queue = new ArrayList<>();
+        for (int i = 0; i < repetitions; i++) {
+            queue.addAll(flattenInstructions(playerId, parsed));
+        }
+
+        // Exécuter les instructions séquentiellement
         player.sendMessage("§aExécution de la séquence d'instructions " + repetitions + " fois...");
-        
+
         BukkitRunnable runnable = new BukkitRunnable() {
-            private int currentRepetition = 0;
-            private int currentInstruction = 0;
+            Iterator<Instruction> it = queue.iterator();
 
             @Override
             public void run() {
+                if (!it.hasNext()) {
+                    player.sendMessage("§aFin de la séquence d'instructions.");
+                    runningTasks.remove(playerId);
+                    this.cancel();
+                    return;
+                }
+
                 // Vérifier si le robot existe toujours
                 if (!RobotPlaceListener.playerRobots.containsKey(playerId) || 
                     RobotPlaceListener.playerRobots.get(playerId) != robot) {
@@ -118,30 +132,147 @@ public class RepeteCommand implements CommandExecutor {
                 }
 
                 // Exécuter l'instruction courante
-                Instruction instruction = instructions.get(currentInstruction);
-                executeInstruction(robot, instruction, player);
-
-                // Passer à l'instruction suivante
-                currentInstruction++;
-
-                // Si toutes les instructions de cette répétition sont terminées
-                if (currentInstruction >= instructions.size()) {
-                    currentInstruction = 0;
-                    currentRepetition++;
-                    if (currentRepetition >= repetitions) {
-                        player.sendMessage("§aFin de la séquence d'instructions.");
-                        this.cancel();
-                        runningTasks.remove(playerId);
-                    }
-                }
+                executeInstruction(robot, it.next(), player);
             }
         };
-        
-        // Enregistrer la tâche et la démarrer
-        BukkitTask task = runnable.runTaskTimer(plugin, 0L, 5L); // 5 ticks (0.25 secondes) entre chaque instruction
+
+        // Stocker et démarrer la tâche
+        BukkitTask task = runnable.runTaskTimer(plugin, 0L, 10L); // 10 ticks (1 seconde) entre chaque instruction
         runningTasks.put(playerId, task);
 
         return true;
+    }
+
+    /**
+     * Aplatit récursivement une liste d'instructions en traitant les repete et fonction
+     * @param playerId UUID du joueur pour accéder à ses fonctions définies
+     * @param instructions Liste des instructions à aplatir
+     * @return Liste aplatie d'instructions (sans instructions répétées ou fonctions)
+     */
+    private List<Instruction> flattenInstructions(UUID playerId, List<Instruction> instructions) {
+        List<Instruction> result = new ArrayList<>();
+        
+        for (Instruction instr : instructions) {
+            switch (instr.type) {
+                case "repete":
+                    // Répéter N fois le flatten du corps
+                    List<Instruction> inner = parseInstructions(instr.param);
+                    for (int i = 0; i < instr.value; i++) {
+                        result.addAll(flattenInstructions(playerId, inner));
+                    }
+                    break;
+                case "fonction":
+                    // Extraire nom et args de la fonction
+                    String functionExpr = instr.param; // ex: "read carre(10,20)"
+                    
+                    // S'assurer que l'expression commence par "read "
+                    if (!functionExpr.startsWith("read ")) {
+                        functionExpr = "read " + functionExpr;
+                    }
+                    
+                    // Extraire le nom de la fonction et ses arguments
+                    Pattern funcPattern = Pattern.compile("read\\s+([a-zA-Z0-9_]+)(?:\\(([^)]*)\\))?");
+                    Matcher m = funcPattern.matcher(functionExpr);
+                    
+                    if (m.find()) {
+                        String fnName = m.group(1);
+                        String argsStr = m.group(2);
+                        
+                        // Récupérer la définition de la fonction
+                        FunctionDefinition def = FonctionCommand.getFunctionDefinition(playerId, fnName);
+                        
+                        if (def != null) {
+                            // Traiter les arguments
+                            List<String> args = new ArrayList<>();
+                            if (argsStr != null && !argsStr.isEmpty()) {
+                                String[] argsArray = argsStr.split(",");
+                                for (String arg : argsArray) {
+                                    args.add(arg.trim());
+                                }
+                            }
+                            
+                            // Vérifier le nombre de paramètres
+                            if (def.getParameters().size() != args.size()) {
+                                // Gérer l'erreur silencieusement (ou log)
+                                System.err.println("Erreur: La fonction '" + fnName + "' attend " + 
+                                                 def.getParameters().size() + " paramètre(s), mais " + 
+                                                 args.size() + " ont été fournis.");
+                                continue;
+                            }
+                            
+                            // Copier le corps et substituer les paramètres
+                            String body = def.getBody();
+                            for (int i = 0; i < def.getParameters().size(); i++) {
+                                body = body.replaceAll("\\b" + def.getParameters().get(i) + "\\b", args.get(i));
+                            }
+                            
+                            // Parser et aplatir récursivement
+                            if (body.startsWith("repete")) {
+                                // Le corps est une répétition, traiter séparément
+                                Pattern repetePattern = Pattern.compile("repete\\s+(\\d+)\\s*\\((.+)\\)");
+                                Matcher repMatcher = repetePattern.matcher(body);
+                                if (repMatcher.find()) {
+                                    int count = Integer.parseInt(repMatcher.group(1));
+                                    String repInstructions = repMatcher.group(2);
+                                    
+                                    List<Instruction> repInnerInstr = parseInstructions(repInstructions);
+                                    for (int i = 0; i < count; i++) {
+                                        result.addAll(flattenInstructions(playerId, repInnerInstr));
+                                    }
+                                }
+                            } else {
+                                // Sinon, parser les instructions individuelles
+                                String[] individualCommands = body.split(";");
+                                for (String cmd : individualCommands) {
+                                    cmd = cmd.trim();
+                                    if (!cmd.isEmpty()) {
+                                        if (cmd.startsWith("avance") || cmd.startsWith("recule") || 
+                                            cmd.startsWith("tourne") || cmd.startsWith("monte") || 
+                                            cmd.startsWith("descends")) {
+                                            // Instructions de mouvement
+                                            String[] parts = cmd.split("\\s+");
+                                            if (parts.length >= 2) {
+                                                try {
+                                                    int value = Integer.parseInt(parts[1]);
+                                                    result.add(new Instruction(parts[0], value));
+                                                } catch (NumberFormatException e) {
+                                                    // Ignorer les instructions malformées
+                                                }
+                                            }
+                                        } else if (cmd.startsWith("trace")) {
+                                            // Instructions trace
+                                            Pattern tracePattern = Pattern.compile("trace\\s+(on|off)(?:\\s+([a-zA-Z_]+))?");
+                                            Matcher traceMatcher = tracePattern.matcher(cmd);
+                                            if (traceMatcher.find()) {
+                                                boolean traceOn = traceMatcher.group(1).equalsIgnoreCase("on");
+                                                String color = traceMatcher.group(2); // Peut être null
+                                                result.add(new Instruction("trace", traceOn, color != null ? color : "blanc"));
+                                            }
+                                        } else if (cmd.contains("read")) {
+                                            // Appel récursif à une autre fonction
+                                            Pattern readPattern = Pattern.compile("read\\s+([a-zA-Z0-9_]+)(?:\\(([^)]*)\\))?");
+                                            Matcher readMatcher = readPattern.matcher(cmd);
+                                            if (readMatcher.find()) {
+                                                String subFnName = readMatcher.group(1);
+                                                String subArgsStr = readMatcher.group(2);
+                                                result.add(new Instruction("fonction", subFnName, subArgsStr));
+                                            }
+                                        }
+                                        // Les autres types d'instructions sont ignorés
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    break;
+                default:
+                    // Instructions standard (avance, recule, tourne, etc.)
+                    result.add(instr);
+                    break;
+            }
+        }
+        
+        return result;
     }
 
     /**
@@ -161,9 +292,9 @@ public class RepeteCommand implements CommandExecutor {
 
     // Classe représentant une instruction à exécuter
     private static class Instruction {
-        private final String type;      // "avance", "recule", "tourne", "trace", "monte", "descends"
-        private final int value;        // La valeur associée à l'instruction (pour avance, recule, tourne, monte, descends)
-        private final String param;     // Paramètre supplémentaire (pour trace: couleur)
+        private final String type;      // "avance", "recule", "tourne", "trace", "monte", "descends", "fonction", "repete"
+        private final int value;        // La valeur associée à l'instruction (pour avance, recule, tourne, monte, descends, repete)
+        private final String param;     // Paramètre supplémentaire (pour trace: couleur, pour fonction: arguments, pour repete: instructions imbriquées)
         private final boolean traceOn;  // Pour trace: true = on, false = off
 
         public Instruction(String type, int value) {
@@ -180,6 +311,22 @@ public class RepeteCommand implements CommandExecutor {
             this.param = color;
             this.traceOn = traceOn;
         }
+        
+        // Constructeur pour l'instruction fonction ou repete
+        public Instruction(String type, String name, String args) {
+            this.type = type;
+            this.value = 0;
+            this.param = name + (args != null ? "(" + args + ")" : "");
+            this.traceOn = false;
+        }
+        
+        // Constructeur spécial pour repete avec nombre de répétitions
+        public Instruction(String type, int count, String innerInstructions) {
+            this.type = type;
+            this.value = count;
+            this.param = innerInstructions;
+            this.traceOn = false;
+        }
     }
 
     // Analyse la chaîne d'instructions et renvoie une liste d'objets Instruction
@@ -189,6 +336,10 @@ public class RepeteCommand implements CommandExecutor {
         // Utiliser une expression régulière pour extraire les paires "commande valeur"
         Pattern patternMove = Pattern.compile("(avance|recule|tourne|monte|descends)\\s+(\\d+)");
         Pattern patternTrace = Pattern.compile("trace\\s+(on|off)(?:\\s+([a-zA-Z_]+))?");
+        // Pattern amélioré pour capturer tous les formats de commande fonction possibles
+        Pattern patternFunction = Pattern.compile("(?:fonction\\s+)?read\\s+([a-zA-Z0-9_]+)(?:\\(([^)]*)\\))?");
+        // Pattern pour capturer les commandes repete imbriquées
+        Pattern patternRepete = Pattern.compile("repete\\s+(\\d+)\\s*\\(([^)]*)\\)");
         
         // Utiliser StringTokenizer pour découper la chaîne en "tokens"
         StringTokenizer tokenizer = new StringTokenizer(instructionsStr, " \t\n\r\f", false);
@@ -200,8 +351,36 @@ public class RepeteCommand implements CommandExecutor {
             
             // Vérifier si on a une commande complète
             String cmd = currentCommand.toString().trim();
+            
+            // Vérifier si c'est un repete imbriqué qui contient des parenthèses
+            if (cmd.startsWith("repete") && cmd.contains("(")) {
+                // Compter les parenthèses pour s'assurer que nous avons la commande complète
+                int openParenCount = 0;
+                int closeParenCount = 0;
+                for (char c : cmd.toCharArray()) {
+                    if (c == '(') openParenCount++;
+                    if (c == ')') closeParenCount++;
+                }
+                
+                // Si nous avons un nombre égal de parenthèses ouvrantes et fermantes, c'est une commande complète
+                if (openParenCount > 0 && openParenCount == closeParenCount) {
+                    Matcher matcherRepete = patternRepete.matcher(cmd);
+                    if (matcherRepete.find()) {
+                        int count = Integer.parseInt(matcherRepete.group(1));
+                        String innerInstructions = matcherRepete.group(2);
+                        
+                        // Ajouter une instruction de type "repete"
+                        instructions.add(new Instruction("repete", count, innerInstructions));
+                        currentCommand = new StringBuilder();
+                        continue;
+                    }
+                }
+            }
+            
+            // Vérifier les autres types d'instructions
             Matcher matcherMove = patternMove.matcher(cmd);
             Matcher matcherTrace = patternTrace.matcher(cmd);
+            Matcher matcherFunction = patternFunction.matcher(cmd);
             
             if (matcherMove.matches()) {
                 // C'est une commande de mouvement
@@ -214,6 +393,12 @@ public class RepeteCommand implements CommandExecutor {
                 boolean traceOn = matcherTrace.group(1).equalsIgnoreCase("on");
                 String color = matcherTrace.group(2); // Peut être null si non spécifié
                 instructions.add(new Instruction("trace", traceOn, color != null ? color : "blanc"));
+                currentCommand = new StringBuilder();
+            } else if (matcherFunction.matches()) {
+                // C'est un appel de fonction
+                String functionName = matcherFunction.group(1);
+                String functionArgs = matcherFunction.group(2); // Peut être null si pas d'arguments
+                instructions.add(new Instruction("fonction", functionName, functionArgs));
                 currentCommand = new StringBuilder();
             }
         }

@@ -1,11 +1,14 @@
 package com.example.robotplugin.listeners;
 
+import com.example.robotplugin.commands.FonctionCommand;
 import org.bukkit.Material;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+
+import java.util.UUID;
 
 public class PlayerJoinListener implements Listener {
     
@@ -20,6 +23,10 @@ public class PlayerJoinListener implements Listener {
         // Donner le bloc au joueur
         event.getPlayer().getInventory().addItem(robotBlock);
         
+        // Charger les fonctions sauvegardées du joueur
+        UUID playerId = event.getPlayer().getUniqueId();
+        FonctionCommand.loadFunctionsFromFile(playerId);
+        
         // Message de bienvenue complet avec toutes les fonctionnalités
         event.getPlayer().sendMessage("§a§l=== Votre Robot Minecraft ===");
         event.getPlayer().sendMessage("§aVous avez reçu un robot ! Posez le bloc magenta pour créer votre robot.");
@@ -32,6 +39,7 @@ public class PlayerJoinListener implements Listener {
         event.getPlayer().sendMessage("§e/trace on <couleur> §7- Active le tracé en laine colorée");
         event.getPlayer().sendMessage("§e/trace off §7- Désactive le tracé");
         event.getPlayer().sendMessage("§e/repete <nombre> (instructions) §7- Répète une séquence d'instructions");
+        event.getPlayer().sendMessage("§e/fonction <nom> [instructions] §7- Crée et exécute des fonctions réutilisables");
         event.getPlayer().sendMessage("§e/robot stop §7- Interrompt l'exécution d'une séquence de commandes");
     }
 }

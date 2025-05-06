@@ -43,6 +43,7 @@ public class RobotPlaceListener implements Listener {
             player.sendMessage("§e• /trace on <couleur> §7- Laisse une trace en laine colorée");
             player.sendMessage("§e• /trace off §7- Arrête de laisser une trace");
             player.sendMessage("§e• /repete <n> (instructions) §7- Ex: /repete 4 (avance 5 tourne 90)");
+            player.sendMessage("§e• /fonction <nom> [instructions] §7- Crée et exécute des fonctions");
             player.sendMessage("§e• /robot stop §7- Interrompt l'exécution d'une séquence");
         }
     }

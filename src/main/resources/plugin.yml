@@ -29,3 +29,6 @@ commands:
   robot:
     description: Commandes spéciales pour le robot
     usage: /robot <commande>
+  fonction:
+    description: Définit et exécute des fonctions personnalisées
+    usage: /fonction <nom> [instructions]

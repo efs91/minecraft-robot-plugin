@@ -1,5 +1,7 @@
 package com.example.robotplugin.listeners;
 
+import com.example.robotplugin.commands.FonctionCommand;
+import com.example.robotplugin.commands.RepeteCommand;
 import com.example.robotplugin.robot.RobotBlock;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -23,6 +25,15 @@ public class PlayerQuitListener implements Listener {
             // Retire l'entrée de la map
             RobotPlaceListener.playerRobots.remove(playerId);
         }
+        
+        // Arrête toute tâche répétitive en cours
+        RepeteCommand.stopRunningTask(playerId);
+        
+        // Sauvegarde les fonctions personnalisées du joueur dans un fichier
+        FonctionCommand.saveFunctionsToFile(playerId);
+        
+        // Supprimer de la mémoire, mais pas du disque
+        FonctionCommand.clearPlayerFunctions(playerId);
         
         // Vider l'inventaire du joueur
         player.getInventory().clear();
