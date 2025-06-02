@@ -40,6 +40,7 @@ public class PlayerJoinListener implements Listener {
         event.getPlayer().sendMessage("§e/trace off §7- Désactive le tracé");
         event.getPlayer().sendMessage("§e/repete <nombre> (instructions) §7- Répète une séquence d'instructions");
         event.getPlayer().sendMessage("§e/fonction <nom> [instructions] §7- Crée et exécute des fonctions réutilisables");
+        event.getPlayer().sendMessage("§7Aide Fonctions: §e/fonction");
         event.getPlayer().sendMessage("§e/robot stop §7- Interrompt l'exécution d'une séquence de commandes");
     }
 }
