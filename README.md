@@ -37,6 +37,7 @@ When a player joins, they receive a magenta glazed terracotta block. Place it to
 - `/repete <nb> (<instructions>)`: Repeat a sequence of instructions `<nb>` times. Example: `/repete 4 (avance 5 tourne 90)`
 - `/fonction create <nom>(<params>) <instructions>`: Define custom functions with parameters.
 - `/fonction read <nom>(<args>)`: Execute a custom function with arguments.
+- `/fonction delete <nom>`: Delete a previously defined custom function.
 - `/robot stop`: Instantly stop any running `/repete` sequence for your robot.
 
 ### Example Sequences
@@ -53,6 +54,7 @@ The `/fonction` command now supports parameters for more flexible programming:
 3. Creating more complex functions: `/fonction create rectangle(largeur,hauteur) repete 2 (avance largeur tourne 90 avance hauteur tourne 90)`
 4. Nested function calls: `/fonction create maison(taille) read rectangle(taille,taille); avance taille; tourne 90; read triangle(taille)`
 5. View all your functions: just type `/fonction` without arguments
+6. Delete a function: `/fonction delete carre` to remove the `carre` function
 
 ### Advanced Programming Techniques
 - **Nested Repeats**: You can now use repeats inside repeats:

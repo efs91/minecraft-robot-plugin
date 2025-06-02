@@ -158,8 +158,7 @@ public class FonctionCommand implements CommandExecutor {
             player.sendMessage("§cFormat incorrect. Utilisez: /fonction create nomFonction(param1,param2) instructions");
             return true;
         }
-        
-        // Vérifier si c'est un appel de fonction (avec le préfixe "read")
+          // Vérifier si c'est un appel de fonction (avec le préfixe "read")
         if (args.length >= 1 && args[0].equalsIgnoreCase("read")) {
             // Retirer le préfixe "read" pour analyser le reste de la commande
             String readCommand = fullCommand.substring(4).trim();
@@ -194,8 +193,41 @@ public class FonctionCommand implements CommandExecutor {
             return true;
         }
         
+        // Vérifier si c'est une suppression de fonction (avec le préfixe "delete")
+        if (args.length >= 1 && args[0].equalsIgnoreCase("delete")) {
+            if (args.length < 2) {
+                player.sendMessage("§cVeuillez spécifier le nom de la fonction à supprimer. Utilisez: /fonction delete nomFonction");
+                return true;
+            }
+            
+            String functionName = args[1];
+            
+            // Vérifier si le nom de la fonction est valide
+            if (!functionName.matches("^[a-zA-Z0-9_]+$")) {
+                player.sendMessage("§cLe nom de la fonction ne doit contenir que des lettres, des chiffres et des underscores.");
+                return true;
+            }
+            
+            // Obtenir la map des fonctions du joueur
+            Map<String, FunctionDefinition> functions = playerFunctions.get(playerId);
+            
+            if (functions == null || !functions.containsKey(functionName)) {
+                player.sendMessage("§cLa fonction '" + functionName + "' n'existe pas.");
+                return true;
+            }
+            
+            // Supprimer la fonction
+            functions.remove(functionName);
+            player.sendMessage("§aFonction '" + functionName + "' supprimée avec succès.");
+            
+            // Sauvegarder les modifications dans le fichier
+            saveFunctionsToFile(playerId);
+            
+            return true;
+        }
+        
         // Si aucun préfixe reconnu
-        player.sendMessage("§cVeuillez utiliser 'create' pour définir une fonction ou 'read' pour exécuter une fonction.");
+        player.sendMessage("§cVeuillez utiliser 'create' pour définir une fonction, 'read' pour exécuter une fonction, ou 'delete' pour supprimer une fonction.");
         showHelp(player);
         return true;
     }
@@ -259,21 +291,19 @@ public class FonctionCommand implements CommandExecutor {
                 String paramName = functionDef.getParameters().get(i);
                 String paramValue = args.get(i);
                 instructions = instructions.replaceAll("\\b" + paramName + "\\b", paramValue);
-            }
-            
-            // Vérifier et exécuter les appels de fonction dans les instructions
-            if (instructions.contains("read") && instructions.contains("(") && instructions.contains(")")) {
-                instructions = processAndExecuteFunctionCalls(instructions, player, callDepth);
-            }
-            
-            // Si les instructions commencent par "repete", on utilise directement ces instructions
+            }            // Si les instructions commencent par "repete", on les exécute directement sans passer par RepeteCommand
             if (instructions.startsWith("repete")) {
+                // Utiliser RepeteCommand mais en passant par dispatchCommand pour conserver le contexte
                 plugin.getServer().dispatchCommand(player, instructions);
             } else {
                 // Sinon, c'est une séquence d'instructions individuelles
-                String[] individualCommands = instructions.split(";");
-                
-                // Exécuter les commandes séquentiellement avec un délai
+                // Vérifier d'abord si c'est séparé par ; ou par des espaces
+                String[] individualCommands;
+                if (instructions.contains(";")) {
+                    individualCommands = instructions.split(";");
+                } else {
+                    individualCommands = parseCommandsFromString(instructions);
+                }
                 executeCommandsSequentially(player, individualCommands, 0, callDepth);
             }
             return true;
@@ -386,8 +416,7 @@ public class FonctionCommand implements CommandExecutor {
         
         return result.toString().trim();
     }
-    
-    /**
+      /**
      * Affiche l'aide pour la commande fonction
      * @param player Le joueur à qui afficher l'aide
      */
@@ -395,11 +424,13 @@ public class FonctionCommand implements CommandExecutor {
         player.sendMessage("§a=== Commande Fonction ===");
         player.sendMessage("§e/fonction create nom(param1,param2) instructions §7- Définit une fonction avec paramètres");
         player.sendMessage("§e/fonction read nom(param1,param2) §7- Exécute une fonction déjà définie avec des paramètres");
+        player.sendMessage("§e/fonction delete nom §7- Supprime une fonction déjà définie");
         player.sendMessage("§7Exemples:");
         player.sendMessage("§7• §e/fonction create carre(size) repete 4( avance size tourne 90)");
         player.sendMessage("§7• §e/fonction create rectangle(x,y) repete 2 (avance x tourne 90 avance y tourne 90)");
         player.sendMessage("§7• §e/fonction create escalier(hauteur,largeur) repete hauteur (avance largeur monte 1)");
         player.sendMessage("§7Appel: §e/fonction read carre(5) §7ou dans une autre fonction: §eread carre(5)");
+        player.sendMessage("§7Suppression: §e/fonction delete carre");
         player.sendMessage("§7Utilisez §e; §7pour séparer plusieurs commandes individuelles");
         player.sendMessage("§7Vos fonctions sont sauvegardées et disponibles à votre prochaine connexion.");
         
@@ -540,5 +571,66 @@ public class FonctionCommand implements CommandExecutor {
             return null;
         }
         return functions.get(functionName);
+    }
+    
+    /**
+     * Parse une chaîne d'instructions séparées par des espaces en tenant compte des appels de fonction
+     * @param instructionsStr La chaîne d'instructions à parser
+     * @return Un tableau de commandes individuelles
+     */
+    private String[] parseCommandsFromString(String instructionsStr) {
+        List<String> commands = new ArrayList<>();
+        String[] words = instructionsStr.trim().split("\\s+");
+        
+        int i = 0;
+        while (i < words.length) {
+            String word = words[i];
+            
+            // Si c'est une commande de mouvement standard avec un paramètre
+            if (word.matches("(avance|recule|tourne|monte|descends)") && i + 1 < words.length) {
+                commands.add(word + " " + words[i + 1]);
+                i += 2;
+            }
+            // Si c'est une commande trace
+            else if (word.equals("trace") && i + 1 < words.length) {
+                if (i + 2 < words.length && words[i + 1].equals("on")) {
+                    // trace on couleur
+                    commands.add(word + " " + words[i + 1] + " " + words[i + 2]);
+                    i += 3;
+                } else {
+                    // trace off
+                    commands.add(word + " " + words[i + 1]);
+                    i += 2;
+                }
+            }
+            // Si c'est un appel de fonction
+            else if (word.equals("read") && i + 1 < words.length) {
+                StringBuilder functionCall = new StringBuilder();
+                functionCall.append(word).append(" ");
+                i++;
+                
+                // Ajouter le nom de la fonction et ses paramètres
+                while (i < words.length) {
+                    functionCall.append(words[i]);
+                    if (words[i].contains(")")) {
+                        // Fin de l'appel de fonction
+                        i++;
+                        break;
+                    }
+                    if (i + 1 < words.length) {
+                        functionCall.append(" ");
+                    }
+                    i++;
+                }
+                commands.add(functionCall.toString());
+            }
+            // Autres commandes simples
+            else {
+                commands.add(word);
+                i++;
+            }
+        }
+        
+        return commands.toArray(new String[0]);
     }
 }
